@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from migen import *
-from migen.build.generic_platform import *
+from litex.build.generic_platform import *
 from litex.build.xilinx import XilinxPlatform
 
 try:
