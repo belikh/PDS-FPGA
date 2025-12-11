@@ -14,3 +14,4 @@ OLD
 nubusfpga_csr_*.h
 __pycache__/
 *.pyc
+build/
