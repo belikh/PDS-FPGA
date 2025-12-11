@@ -31,13 +31,6 @@ class SE30PDS(Module):
         p_bg = platform.request("bg_3v3_n")
         p_bgack = platform.request("bgack_3v3_n")
 
-        # Buffer Enable for NuBus-to-ZTex Board
-        try:
-             p_oe = platform.request("nubus_oe_n")
-             self.comb += p_oe.eq(0) # Active Low Enable
-        except:
-             pass # Not present on platform (e.g. simulation or different board)
-
         # ==============================================================================
         # Signal Definitions
         # ==============================================================================
@@ -99,6 +92,22 @@ class SE30PDS(Module):
         bgack_raw = Signal() # Raw Input
 
         bgack_sys = Signal() # To monitor bus busy status
+
+        # External Buffer Control (New Board)
+        try:
+             # Data Direction (1 = Output, 0 = Input)
+             p_dir_data = platform.request("pds_dir_data")
+             self.comb += p_dir_data.eq(data_oe)
+
+             # Address Direction (1 = Output/Master, 0 = Input/Slave)
+             p_dir_addr = platform.request("pds_dir_addr")
+             self.comb += p_dir_addr.eq(master_addr_oe)
+
+             # Output Enable (Active Low)
+             p_oe = platform.request("pds_oe_n")
+             self.comb += p_oe.eq(0) # Always Enable
+        except:
+             print("Warning: PDS Buffer Control signals not found on platform.")
 
         # ==============================================================================
         # IO Buffers (Tristates) & Synchronization
