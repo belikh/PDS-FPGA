@@ -44,6 +44,11 @@ class SE30PDS(Module):
         self.dbg_start_cycle = Signal()
         self.dbg_sel = Signal(4)
 
+        # Expose internal signals for simulation
+        if sim:
+            self.data_out = data_out
+            self.data_oe = data_oe
+
         # Synchronization
         # We use MultiReg to synchronize the async PDS signals to the system clock
         self.specials += [
@@ -107,10 +112,14 @@ class SE30PDS(Module):
         a0 = addr[0]
         a1 = addr[1]
 
-        # Migen Case is good for this
+        # We are using the SYNCHRONIZED signals for logic, not the pins.
+        # But wait, addr is synchronized, but siz0/siz1 were also synchronized.
+        # Let's verify we are using the sync versions.
+        # Original code used p_siz0 and p_siz1 in the Case statement, which is wrong.
+        # It should use siz0_sys and siz1_sys.
+
         self.comb += [
-             Case(Cat(p_siz0, p_siz1), { # SIZ0 is LSB of Cat? No, Cat(LSB, MSB) usually.
-                 # Wait, Cat(a, b) -> {b, a} (b is MSB).
+             Case(Cat(siz0_sys, siz1_sys), { # SIZ0 is LSB of Cat. Cat(LSB, MSB).
                  # SIZ1 (MSB), SIZ0 (LSB).
                  # 0 (00): Long Word
                  0b00: wb_sel.eq(0xF),
