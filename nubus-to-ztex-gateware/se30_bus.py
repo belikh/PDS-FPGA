@@ -167,7 +167,9 @@ class SE30PDS(Module):
             wb_read.adr.eq(addr[2:32]), # Word aligned
             wb_read.sel.eq(wb_sel),
 
-            If(wb_read.ack,
+            If(as_sys, # Master aborted
+                NextState("IDLE")
+            ).Elif(wb_read.ack,
                 NextValue(data_out, wb_read.dat_r),
                 NextState("READ_DRIVE")
             )
@@ -188,7 +190,9 @@ class SE30PDS(Module):
         # WRITE PATH
         fsm.act("WRITE_WAIT_DS",
             # We need DS to be Active (Low) to ensure data is valid on bus
-            If(~ds_sys,
+            If(as_sys, # Master aborted
+                NextState("IDLE")
+            ).Elif(~ds_sys,
                 NextState("WRITE_WB_REQ")
             )
         )
@@ -201,7 +205,9 @@ class SE30PDS(Module):
             wb_write.dat_w.eq(data_in),
             wb_write.sel.eq(wb_sel),
 
-            If(wb_write.ack,
+            If(as_sys, # Master aborted
+                NextState("IDLE")
+            ).Elif(wb_write.ack,
                 NextState("WRITE_ACK")
             )
         )

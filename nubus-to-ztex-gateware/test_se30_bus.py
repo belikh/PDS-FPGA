@@ -34,9 +34,10 @@ def test_bench(dut, platform, wb_read, wb_write):
     yield p_addr.eq(0)
     yield p_siz0.eq(0)
     yield p_siz1.eq(0)
+    yield p_data.eq(0)
 
     yield
-    print("Cycle 0: Init")
+    print("--- READ TEST ---")
 
     # Start Read Cycle
     # Address = 0xF9000010 (Slot 9)
@@ -54,50 +55,125 @@ def test_bench(dut, platform, wb_read, wb_write):
     print("Cycle 2: AS Low")
 
     # Wait for FSM to react
-    for i in range(15):
+    read_success = False
+    for i in range(20):
         yield
         fsm_state = yield dut.fsm.state
-        dbg_as = yield dut.dbg_as_sys
-        dbg_addr = yield dut.dbg_addr
-        dbg_start = yield dut.dbg_start_cycle
-        dbg_my_slot = yield dut.dbg_my_slot
-        dbg_sel = yield dut.dbg_sel
-
-        print(f"Cycle {3+i}: Wait... State={fsm_state}, AS={dbg_as}, Addr={hex(dbg_addr)}, SEL={bin(dbg_sel)}")
 
         # Mimic Wishbone Slave response
         cyc = yield wb_read.cyc
         stb = yield wb_read.stb
         if cyc and stb:
             sel = yield wb_read.sel
-            print(f"  Wishbone Req detected! SEL={bin(sel)}")
+            # print(f"  Wishbone Req detected! SEL={bin(sel)}")
             yield wb_read.ack.eq(1)
             yield wb_read.dat_r.eq(0xDEADBEEF)
         else:
             yield wb_read.ack.eq(0)
 
-    # Check DSACK
-    dsack0 = yield p_dsack0
-    dsack1 = yield p_dsack1
-    print(f"DSACK0={dsack0}, DSACK1={dsack1}")
+        dsack0 = yield p_dsack0
+        dsack1 = yield p_dsack1
+        if dsack0 == 0 and dsack1 == 0:
+            read_success = True
+            break
 
-    if dsack0 == 0 and dsack1 == 0:
-        print("PASS: DSACK asserted.")
-    else:
-        print("FAIL: DSACK not asserted.")
+    print(f"DSACK asserted: {read_success}")
+    if not read_success:
+        print("FAIL: DSACK not asserted within timeout.")
+        return
 
     # Release AS
     yield p_as.eq(1)
     yield
     print("Cycle End: AS High")
 
-    # Check DSACK Release
-    yield
-    dsack0 = yield p_dsack0
-    print(f"DSACK0={dsack0}")
-    if dsack0 == 1:
-        print("PASS: DSACK released.")
+    # Wait for DSACK Release (needs sync delay)
+    dsack_released = False
+    for i in range(5):
+        yield
+        dsack0 = yield p_dsack0
+        if dsack0 == 1:
+            dsack_released = True
+            break
 
+    print(f"DSACK released: {dsack_released}")
+    if not dsack_released:
+        print("FAIL: DSACK not released.")
+
+    yield
+    yield
+
+    # ---------------------------------------------------------
+    print("\n--- WRITE TEST ---")
+
+    # Start Write Cycle
+    # Address = 0xFA000020 (Slot A)
+    # Data = 0xCAFEBABE
+    # Size = Long Word (SIZ1=0, SIZ0=0)
+
+    yield p_addr.eq(0xFA000020)
+    yield p_rw.eq(0) # Write
+    yield p_siz1.eq(0)
+    yield p_siz0.eq(0)
+    yield p_data.eq(0xCAFEBABE) # Drive data on bus
+    yield
+
+    # Assert AS (Low)
+    yield p_as.eq(0)
+    yield
+
+    # Assert DS (Low) - Usually happens shortly after AS
+    yield p_ds.eq(0)
+    yield
+
+    write_success = False
+    for i in range(20):
+        yield
+
+        # Mimic Wishbone Slave response
+        cyc = yield wb_write.cyc
+        stb = yield wb_write.stb
+        if cyc and stb:
+            sel = yield wb_write.sel
+            we = yield wb_write.we
+            dat_w = yield wb_write.dat_w
+            adr = yield wb_write.adr
+
+            # Verify data
+            if we == 1 and dat_w == 0xCAFEBABE:
+                # print(f"  Wishbone Write: Addr={hex(adr*4)} Data={hex(dat_w)}")
+                yield wb_write.ack.eq(1)
+            else:
+                 print(f"  Unexpected WB req: WE={we} Data={hex(dat_w)}")
+        else:
+            yield wb_write.ack.eq(0)
+
+        dsack0 = yield p_dsack0
+        dsack1 = yield p_dsack1
+        if dsack0 == 0 and dsack1 == 0:
+            write_success = True
+            break
+
+    print(f"Write DSACK asserted: {write_success}")
+    if not write_success:
+         print("FAIL: Write DSACK not asserted.")
+         return
+
+    # Release AS and DS
+    yield p_as.eq(1)
+    yield p_ds.eq(1)
+    yield
+
+    # Wait for DSACK Release
+    dsack_released = False
+    for i in range(5):
+        yield
+        dsack0 = yield p_dsack0
+        if dsack0 == 1:
+            dsack_released = True
+            break
+
+    print(f"Write DSACK released: {dsack_released}")
 
 if __name__ == "__main__":
     platform = MockPlatformCached()
