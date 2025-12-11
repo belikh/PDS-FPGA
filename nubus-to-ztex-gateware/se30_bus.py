@@ -26,119 +26,189 @@ class SE30PDS(Module):
         p_siz1 = platform.request("siz1_3v3_n")
         # p_berr = platform.request("berr_3v3_n") # Not driven yet
 
-        # Internal signals (Active High for convenience inside FPGA)
-        addr = Signal(32)
+        # Arbitration
+        p_br = platform.request("br_3v3_n")
+        p_bg = platform.request("bg_3v3_n")
+        p_bgack = platform.request("bgack_3v3_n")
+
+        # ==============================================================================
+        # Signal Definitions
+        # ==============================================================================
+
+        # Data Bus (Bidirectional)
         data_in = Signal(32)
         data_out = Signal(32)
-        data_oe = Signal() # Output Enable
+        data_oe = Signal()
 
-        as_sys = Signal() # Synchronized /AS (Active Low)
-        ds_sys = Signal() # Synchronized /DS (Active Low)
-        rw_sys = Signal() # Synchronized R/W (High=Read, Low=Write)
+        # Address Bus (Bidirectional)
+        slave_addr_raw = Signal(32)
+        slave_addr = Signal(32) # Synchronized
+        master_addr = Signal(32)
+        master_addr_oe = Signal()
+
+        # Control Signals (Bidirectional)
+        # Inputs (for Slave logic)
+        slave_as_raw = Signal()
+        slave_ds_raw = Signal()
+        slave_rw_raw = Signal()
+        slave_siz0_raw = Signal()
+        slave_siz1_raw = Signal()
+
+        # Synchronized Inputs (for Slave logic)
+        as_sys = Signal()
+        ds_sys = Signal()
+        rw_sys = Signal()
         siz0_sys = Signal()
         siz1_sys = Signal()
 
-        # Debug signals
-        self.dbg_as_sys = as_sys
-        self.dbg_addr = addr
-        self.dbg_start_cycle = Signal()
-        self.dbg_sel = Signal(4)
+        # Outputs (for Master logic)
+        master_as = Signal()
+        master_ds = Signal()
+        master_rw = Signal()
+        master_siz0 = Signal()
+        master_siz1 = Signal()
+        master_ctrl_oe = Signal() # Group OE for control signals
 
-        # Expose internal signals for simulation
-        if sim:
-            self.data_out = data_out
-            self.data_oe = data_oe
+        # DSACK (Bidirectional)
+        # Input (for Master logic)
+        master_dsack0_raw = Signal()
+        master_dsack1_raw = Signal()
+        master_dsack0_sys = Signal() # Sync
+        master_dsack1_sys = Signal() # Sync
+
+        # Output (for Slave logic)
+        slave_dsack0_out = Signal(reset=0) # Always drive 0 when enabled
+        slave_dsack1_out = Signal(reset=0)
+        slave_dsack_oe = Signal() # Enable when we are the selected slave
+
+        # Arbitration (Bidirectional / Input)
+        bg_sys = Signal() # Bus Grant (Input, Sync)
+
+        br_out = Signal(reset=0) # Drive 0 when requesting
+        br_oe = Signal() # Enable Output
+
+        bgack_out = Signal(reset=0) # Drive 0 when owning
+        bgack_oe = Signal() # Enable Output
+        bgack_raw = Signal() # Raw Input
+
+        bgack_sys = Signal() # To monitor bus busy status
+
+        # ==============================================================================
+        # IO Buffers (Tristates) & Synchronization
+        # ==============================================================================
+
+        if not sim:
+             # Data
+             self.specials += Tristate(p_data, data_out, data_oe, data_in)
+
+             # Address
+             self.specials += Tristate(p_addr, master_addr, master_addr_oe, slave_addr_raw)
+
+             # Control
+             self.specials += Tristate(p_as, master_as, master_ctrl_oe, slave_as_raw)
+             self.specials += Tristate(p_ds, master_ds, master_ctrl_oe, slave_ds_raw)
+             self.specials += Tristate(p_rw, master_rw, master_ctrl_oe, slave_rw_raw)
+             self.specials += Tristate(p_siz0, master_siz0, master_ctrl_oe, slave_siz0_raw)
+             self.specials += Tristate(p_siz1, master_siz1, master_ctrl_oe, slave_siz1_raw)
+
+             # DSACK
+             self.specials += Tristate(p_dsack0, slave_dsack0_out, slave_dsack_oe, master_dsack0_raw)
+             self.specials += Tristate(p_dsack1, slave_dsack1_out, slave_dsack_oe, master_dsack1_raw)
+
+             # Arbitration
+             # BR is Output (Open Drain emulation via Tristate)
+             self.specials += Tristate(p_br, br_out, br_oe, Signal())
+             # BG is Input
+             # BGACK is InOut (Open Drain) - we need to monitor it too
+             self.specials += Tristate(p_bgack, bgack_out, bgack_oe, bgack_raw)
+
+        else:
+             # Simulation Logic
+             self.comb += [
+                 data_in.eq(p_data),
+                 slave_addr_raw.eq(p_addr),
+                 slave_as_raw.eq(p_as),
+                 slave_ds_raw.eq(p_ds),
+                 slave_rw_raw.eq(p_rw),
+                 slave_siz0_raw.eq(p_siz0),
+                 slave_siz1_raw.eq(p_siz1),
+                 master_dsack0_raw.eq(p_dsack0),
+                 master_dsack1_raw.eq(p_dsack1),
+                 bgack_raw.eq(p_bgack)
+             ]
+             # For outputs in SIM, we usually rely on testbench to check signals directly
+             self.data_out = data_out
+             self.data_oe = data_oe
+             self.slave_dsack_oe = slave_dsack_oe
+             self.master_addr = master_addr
+             self.master_addr_oe = master_addr_oe
+             self.master_as = master_as
+             self.master_ctrl_oe = master_ctrl_oe
+             self.br_oe = br_oe
+             self.bgack_oe = bgack_oe
 
         # Synchronization
-        # We use MultiReg to synchronize the async PDS signals to the system clock
         self.specials += [
-            MultiReg(p_addr, addr),
-            MultiReg(p_as, as_sys),
-            MultiReg(p_ds, ds_sys),
-            MultiReg(p_rw, rw_sys),
-            MultiReg(p_siz0, siz0_sys),
-            MultiReg(p_siz1, siz1_sys),
+            MultiReg(slave_addr_raw, slave_addr),
+            MultiReg(slave_as_raw, as_sys),
+            MultiReg(slave_ds_raw, ds_sys),
+            MultiReg(slave_rw_raw, rw_sys),
+            MultiReg(slave_siz0_raw, siz0_sys),
+            MultiReg(slave_siz1_raw, siz1_sys),
+            MultiReg(master_dsack0_raw, master_dsack0_sys),
+            MultiReg(master_dsack1_raw, master_dsack1_sys),
+            MultiReg(p_bg, bg_sys),
+            MultiReg(bgack_raw, bgack_sys),
         ]
 
-        # Data Bus Tristate
-        if not sim:
-             self.specials += Tristate(p_data, data_out, data_oe, data_in)
-        else:
-             # Simulation Logic: Connect Input directly, ignore output for now (or drive it back?)
-             # In sim, we only verify we can read.
-             self.comb += data_in.eq(p_data)
+        # Debug signals
+        self.dbg_as_sys = as_sys
+        self.dbg_addr = slave_addr
+        self.dbg_start_cycle = Signal()
+        self.dbg_sel = Signal(4)
+        self.dbg_my_slot = Signal()
 
         # Edge Detection for AS (Start of Cycle)
         as_sys_d = Signal()
         self.sync += as_sys_d.eq(as_sys)
-        #start_cycle = Signal()
         start_cycle = self.dbg_start_cycle
-        self.comb += start_cycle.eq(as_sys_d & ~as_sys) # Falling edge of /AS (Active Low) -> High to Low transition
+        self.comb += start_cycle.eq(as_sys_d & ~as_sys) # Falling edge of /AS
+
+        # ==============================================================================
+        # SLAVE LOGIC
+        # ==============================================================================
 
         # Address Decoding
-        # Slot 9: F9xx xxxx
-        # Slot A: FAxx xxxx
-        # Slot B: FBxx xxxx
-        # We'll match any of these for now.
-        my_slot = Signal()
+        # Slot 9: F9xx xxxx, Slot A: FAxx xxxx, Slot B: FBxx xxxx
+        my_slot = self.dbg_my_slot
         self.comb += my_slot.eq(
-            (addr[24:32] == 0xF9) |
-            (addr[24:32] == 0xFA) |
-            (addr[24:32] == 0xFB)
+            (slave_addr[24:32] == 0xF9) |
+            (slave_addr[24:32] == 0xFA) |
+            (slave_addr[24:32] == 0xFB)
         )
-        self.dbg_my_slot = my_slot
-
-        # Signals to drive outputs (Active Low)
-        dsack0_out = Signal(reset=1)
-        dsack1_out = Signal(reset=1)
-
-        self.comb += [
-            p_dsack0.eq(dsack0_out),
-            p_dsack1.eq(dsack1_out)
-        ]
 
         # Byte Select Logic (Wishbone sel)
-        # 68030 SIZ0/SIZ1/A0/A1 logic to Wishbone SEL (4 bits)
-        # SIZ1 SIZ0 Size
-        # 0    1    Byte
-        # 1    0    Word (2 bytes)
-        # 1    1    3 Bytes
-        # 0    0    Long Word (4 bytes)
-        #
-        # WB Sel [3:0] where [3] is MSB (D31-D24)
-        # 68030 is Big Endian. A0=0,A1=0 -> MSB.
-
         wb_sel = Signal(4)
-        a0 = addr[0]
-        a1 = addr[1]
+        a0 = slave_addr[0]
+        a1 = slave_addr[1]
 
-        # We are using the SYNCHRONIZED signals for logic, not the pins.
-        # But wait, addr is synchronized, but siz0/siz1 were also synchronized.
-        # Let's verify we are using the sync versions.
-        # Original code used p_siz0 and p_siz1 in the Case statement, which is wrong.
-        # It should use siz0_sys and siz1_sys.
-
+        # Use synchronized signals
         self.comb += [
-             Case(Cat(siz0_sys, siz1_sys), { # SIZ0 is LSB of Cat. Cat(LSB, MSB).
-                 # SIZ1 (MSB), SIZ0 (LSB).
-                 # 0 (00): Long Word
-                 0b00: wb_sel.eq(0xF),
-                 # 1 (01): Byte
-                 0b01: Case(Cat(a0, a1), {
-                     0b00: wb_sel.eq(0b1000), # D31-D24
-                     0b01: wb_sel.eq(0b0100), # D23-D16
-                     0b10: wb_sel.eq(0b0010), # D15-D8
-                     0b11: wb_sel.eq(0b0001), # D7-D0
+             Case(Cat(siz0_sys, siz1_sys), {
+                 0b00: wb_sel.eq(0xF), # Long Word
+                 0b01: Case(Cat(a0, a1), { # Byte
+                     0b00: wb_sel.eq(0b1000),
+                     0b01: wb_sel.eq(0b0100),
+                     0b10: wb_sel.eq(0b0010),
+                     0b11: wb_sel.eq(0b0001),
                  }),
-                 # 2 (10): Word
-                 0b10: Case(Cat(a0, a1), {
-                     0b00: wb_sel.eq(0b1100), # D31-D16
-                     0b10: wb_sel.eq(0b0011), # D15-D0
-                     "default": wb_sel.eq(0xF) # Invalid alignment for Word?
+                 0b10: Case(Cat(a0, a1), { # Word
+                     0b00: wb_sel.eq(0b1100),
+                     0b10: wb_sel.eq(0b0011),
+                     "default": wb_sel.eq(0xF)
                  }),
-                 # 3 (11): 3 Bytes
-                 0b11: Case(Cat(a0, a1), {
-                     0b00: wb_sel.eq(0b1110), # D31-D8
+                 0b11: Case(Cat(a0, a1), { # 3 Bytes
+                     0b00: wb_sel.eq(0b1110),
                      "default": wb_sel.eq(0xF)
                  })
              })
@@ -146,19 +216,9 @@ class SE30PDS(Module):
         self.comb += self.dbg_sel.eq(wb_sel)
 
         # Slave FSM
-        self.submodules.fsm = fsm = FSM(reset_state="IDLE")
+        self.submodules.slave_fsm = slave_fsm = FSM(reset_state="IDLE")
 
-        # Wishbone Read Logic
-        # We need to present address to WB, strobing CYC/STB.
-        # Wait for ACK.
-        # Then drive data.
-
-        # Wishbone Write Logic
-        # Wait for Data Valid (DS Low).
-        # Present Address/Data to WB.
-        # Wait for ACK.
-
-        fsm.act("IDLE",
+        slave_fsm.act("IDLE",
             If(start_cycle & my_slot,
                 If(rw_sys, # Read
                     NextState("READ_WB_REQ")
@@ -169,11 +229,11 @@ class SE30PDS(Module):
         )
 
         # READ PATH
-        fsm.act("READ_WB_REQ",
+        slave_fsm.act("READ_WB_REQ",
             wb_read.cyc.eq(1),
             wb_read.stb.eq(1),
             wb_read.we.eq(0),
-            wb_read.adr.eq(addr[2:32]), # Word aligned
+            wb_read.adr.eq(slave_addr[2:32]),
             wb_read.sel.eq(wb_sel),
 
             If(as_sys, # Master aborted
@@ -184,48 +244,188 @@ class SE30PDS(Module):
             )
         )
 
-        fsm.act("READ_DRIVE",
-            data_oe.eq(1), # Enable Output
-            dsack0_out.eq(0), # Assert DSACK (Active Low)
-            dsack1_out.eq(0),
+        slave_fsm.act("READ_DRIVE",
+            data_oe.eq(1), # Drive Data Bus
+            slave_dsack_oe.eq(1), # Drive DSACK
+            # dsack outputs are 0 by default
 
-            # Wait for Master to release AS (End of Cycle)
-            # AS is Active Low. We wait for it to go High (Inactive).
-            If(as_sys,
+            If(as_sys, # Wait for AS High
                 NextState("IDLE")
             )
         )
 
         # WRITE PATH
-        fsm.act("WRITE_WAIT_DS",
-            # We need DS to be Active (Low) to ensure data is valid on bus
-            If(as_sys, # Master aborted
+        slave_fsm.act("WRITE_WAIT_DS",
+            If(as_sys,
                 NextState("IDLE")
             ).Elif(~ds_sys,
                 NextState("WRITE_WB_REQ")
             )
         )
 
-        fsm.act("WRITE_WB_REQ",
+        slave_fsm.act("WRITE_WB_REQ",
             wb_write.cyc.eq(1),
             wb_write.stb.eq(1),
             wb_write.we.eq(1),
-            wb_write.adr.eq(addr[2:32]),
+            wb_write.adr.eq(slave_addr[2:32]),
             wb_write.dat_w.eq(data_in),
             wb_write.sel.eq(wb_sel),
 
-            If(as_sys, # Master aborted
+            If(as_sys,
                 NextState("IDLE")
             ).Elif(wb_write.ack,
                 NextState("WRITE_ACK")
             )
         )
 
-        fsm.act("WRITE_ACK",
-            dsack0_out.eq(0),
-            dsack1_out.eq(0),
+        slave_fsm.act("WRITE_ACK",
+            slave_dsack_oe.eq(1),
 
             If(as_sys,
                 NextState("IDLE")
             )
+        )
+
+        # ==============================================================================
+        # MASTER LOGIC (DMA)
+        # ==============================================================================
+
+        # Bus Arbitration FSM
+        self.submodules.arb_fsm = arb_fsm = FSM(reset_state="IDLE")
+
+        bus_grant = Signal()
+        bus_owned = Signal()
+
+        arb_fsm.act("IDLE",
+            If(wb_dma.cyc & wb_dma.stb, # Wishbone Request
+                 NextState("REQUEST_BUS")
+            )
+        )
+
+        arb_fsm.act("REQUEST_BUS",
+            br_oe.eq(1), # Assert /BR (Active Low, so drive 0)
+
+            # Wait for /BG (Active Low)
+            If(~bg_sys,
+                NextState("WAIT_BUS_FREE")
+            )
+        )
+
+        arb_fsm.act("WAIT_BUS_FREE",
+            br_oe.eq(1), # Keep asserting BR
+
+            # Bus is free when /AS is High, /DSACK is High (Inactive), /BGACK is High
+            # Note: /BGACK might be driven by us if we own it, but here we are waiting to take it.
+            # bgack_sys is synchronized input.
+
+            If(as_sys & master_dsack0_sys & master_dsack1_sys & bgack_sys,
+                NextState("OWN_BUS")
+            )
+        )
+
+        arb_fsm.act("OWN_BUS",
+             bgack_oe.eq(1), # Assert /BGACK (Active Low)
+             bus_owned.eq(1),
+
+             # If DMA transaction finished, release bus
+             If(~(wb_dma.cyc & wb_dma.stb),
+                 NextState("IDLE")
+             )
+        )
+
+        # Master Transfer FSM
+        self.submodules.master_fsm = master_fsm = FSM(reset_state="IDLE")
+
+        # Mapping Wishbone Signals to PDS Signals
+        # WB Address is Word aligned (typically). PDS is Byte/Word/Long.
+        # We assume WB DMA requests are 32-bit for now.
+
+        master_fsm.act("IDLE",
+             If(bus_owned & wb_dma.cyc & wb_dma.stb,
+                 NextState("DRIVE_ADDR")
+             )
+        )
+
+        master_fsm.act("DRIVE_ADDR",
+             # Assert /BGACK (via bus_owned logic in Arb FSM)
+
+             # Drive Address, FC, SIZ, RW
+             master_addr_oe.eq(1),
+             master_ctrl_oe.eq(1),
+
+             master_addr.eq(Cat(Signal(2), wb_dma.adr)), # Convert WB word addr to Byte addr
+             master_rw.eq(~wb_dma.we), # High = Read, Low = Write
+
+             # SIZ=00 (Long Word) for now. Support Byte later?
+             master_siz0.eq(0),
+             master_siz1.eq(0),
+
+             If(wb_dma.we,
+                 # If Write, we can also drive Data
+                 data_oe.eq(1),
+                 data_out.eq(wb_dma.dat_w),
+                 NextState("ASSERT_AS_DS")
+             ).Else(
+                 # Read
+                 NextState("ASSERT_AS_DS")
+             )
+        )
+
+        master_fsm.act("ASSERT_AS_DS",
+             master_addr_oe.eq(1),
+             master_ctrl_oe.eq(1),
+             master_addr.eq(Cat(Signal(2), wb_dma.adr)),
+             master_rw.eq(~wb_dma.we),
+             master_siz0.eq(0),
+             master_siz1.eq(0),
+
+             If(wb_dma.we,
+                 data_oe.eq(1),
+                 data_out.eq(wb_dma.dat_w)
+             ),
+
+             master_as.eq(0), # Assert AS (Low)
+             master_ds.eq(0), # Assert DS (Low)
+
+             NextState("WAIT_ACK")
+        )
+
+        master_fsm.act("WAIT_ACK",
+             master_addr_oe.eq(1),
+             master_ctrl_oe.eq(1),
+             master_addr.eq(Cat(Signal(2), wb_dma.adr)),
+             master_rw.eq(~wb_dma.we),
+             master_siz0.eq(0),
+             master_siz1.eq(0),
+
+             master_as.eq(0),
+             master_ds.eq(0),
+
+             If(wb_dma.we,
+                 data_oe.eq(1),
+                 data_out.eq(wb_dma.dat_w)
+             ),
+
+             # Wait for DSACK0 or DSACK1 (Active Low)
+             If((~master_dsack0_sys) | (~master_dsack1_sys),
+                 If(~wb_dma.we,
+                     NextValue(wb_dma.dat_r, data_in)
+                 ),
+                 wb_dma.ack.eq(1),
+                 NextState("COMPLETE")
+             )
+        )
+
+        master_fsm.act("COMPLETE",
+             # Release AS/DS
+             master_addr_oe.eq(1),
+             master_ctrl_oe.eq(1),
+
+             master_as.eq(1),
+             master_ds.eq(1),
+
+             # Wait for DSACK Release? 68030 says we can just negate AS.
+             # But good to check.
+
+             NextState("IDLE")
         )
