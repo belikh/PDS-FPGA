@@ -31,6 +31,13 @@ class SE30PDS(Module):
         p_bg = platform.request("bg_3v3_n")
         p_bgack = platform.request("bgack_3v3_n")
 
+        # Buffer Enable for NuBus-to-ZTex Board
+        try:
+             p_oe = platform.request("nubus_oe_n")
+             self.comb += p_oe.eq(0) # Active Low Enable
+        except:
+             pass # Not present on platform (e.g. simulation or different board)
+
         # ==============================================================================
         # Signal Definitions
         # ==============================================================================

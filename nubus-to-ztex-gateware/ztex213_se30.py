@@ -56,15 +56,18 @@ _se30_pds_io = [
         "V9 U9 " +                # LED/Serial (2)
         "T5 " +                   # CLK2X (1)
         "T6 " +                   # EXTRA (1) - Was TM0_O_N
-        "G17 " +                  # RESET (1)
-        "H17"                     # MASTER_DIR (1)
+        "G17 " +                  # RESET (1) - WARNING: G17 is nubus_ad_dir on carrier!
+        "H17"                     # MASTER_DIR (1) - WARNING: H17 is arb_o_n on carrier!
     ), IOStandard("lvttl")),
 
     # Control Signals
     # /AS
     ("as_3v3_n",           0, Pins("J13"), IOStandard("lvttl")), # Was arbcy_n
     # /DS
-    ("ds_3v3_n",           0, Pins("G13"), IOStandard("lvttl")), # Was nubus_oe
+    ("ds_3v3_n",           0, Pins("U8"), IOStandard("lvttl")), # Moved from G13. U8 is Input Only (Reset on NuBus). Slave Mode Only.
+    # NUBUS_OE (G13) - Must be driven Low to enable buffers
+    ("nubus_oe_n",         0, Pins("G13"), IOStandard("lvttl")),
+
     # R/W
     ("rw_3v3_n",           0, Pins("G16"), IOStandard("lvttl")), # Was nubus_ad_dir
     # /DSACK0
@@ -80,7 +83,7 @@ _se30_pds_io = [
     ("fc_3v3_n",           0, Pins("G14 R3 R5"), IOStandard("lvttl")), # Misc pins
 
     # Interrupts /IRQ1-3
-    ("irq_3v3_n",          0, Pins("U8 K13 J15"), IOStandard("lvttl")), # Reusing unused inputs
+    ("irq_3v3_n",          0, Pins("K13 J15"), IOStandard("lvttl")), # Removed U8 (used for DS). Only 2 pins available.
 
     # Bus Arbitration
     ("br_3v3_n",           0, Pins("R6"), IOStandard("lvttl")),
