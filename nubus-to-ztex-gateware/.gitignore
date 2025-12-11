@@ -12,3 +12,5 @@ blit.s
 *.patch
 OLD
 nubusfpga_csr_*.h
+__pycache__/
+*.pyc
