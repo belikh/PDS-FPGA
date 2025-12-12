@@ -26,10 +26,9 @@ class SE30PDS(Module):
         p_siz1 = platform.request("siz1_3v3_n")
         p_berr = platform.request("berr_3v3_n")
 
-        # Interrupts (Output from FPGA to Mac)
-        p_ipl0 = platform.request("ipl0_3v3_n")
-        p_ipl1 = platform.request("ipl1_3v3_n")
-        p_ipl2 = platform.request("ipl2_3v3_n")
+        # Interrupts (Output from FPGA to Mac - Slot Interrupts /IRQ1-3)
+        # We request the whole resource which has 3 bits.
+        p_irq = platform.request("irq_3v3_n")
 
         # Arbitration
         p_br = platform.request("br_3v3_n")
@@ -46,7 +45,7 @@ class SE30PDS(Module):
         data_oe = Signal()
 
         # Interrupts (Input from SoC)
-        self.irq_out = Signal(3) # [IPL0, IPL1, IPL2] - Active High Internal
+        self.irq_out = Signal(3) # [IRQ1, IRQ2, IRQ3] - Active High Internal
 
         # Bus Error (Input)
         berr_raw = Signal()
@@ -135,10 +134,13 @@ class SE30PDS(Module):
              self.specials += Tristate(p_bgack, bgack_out, bgack_oe, bgack_raw)
 
              # Interrupts (Open Drain Emulation)
-             # If irq_out[x] is 1, drive 0. If 0, High-Z (1 via pull-up)
-             self.specials += Tristate(p_ipl0, Signal(reset=0), self.irq_out[0], Signal())
-             self.specials += Tristate(p_ipl1, Signal(reset=0), self.irq_out[1], Signal())
-             self.specials += Tristate(p_ipl2, Signal(reset=0), self.irq_out[2], Signal())
+             # IRQ signals on PDS are Active Low, Open Collector.
+             # If irq_out[x] is 1 (Active), drive 0 (Active Low).
+             # If irq_out[x] is 0 (Inactive), High-Z (Pull-up pulls high).
+             # We use individual pins from the p_irq Signal(3).
+             self.specials += Tristate(p_irq[0], Signal(reset=0), self.irq_out[0], Signal())
+             self.specials += Tristate(p_irq[1], Signal(reset=0), self.irq_out[1], Signal())
+             self.specials += Tristate(p_irq[2], Signal(reset=0), self.irq_out[2], Signal())
 
              # BERR Input
              self.specials += Tristate(p_berr, Signal(), Signal(), berr_raw)
@@ -169,7 +171,7 @@ class SE30PDS(Module):
              self.br_oe = br_oe
              self.bgack_oe = bgack_oe
 
-             # Expose IPL output enables for simulation verification
+             # Expose IRQ output enables for simulation verification
              self.ipl0_oe = self.irq_out[0]
              self.ipl1_oe = self.irq_out[1]
              self.ipl2_oe = self.irq_out[2]
