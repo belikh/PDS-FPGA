@@ -30,6 +30,10 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
     p_br = platform.signals["br_3v3_n"]
     p_bg = platform.signals["bg_3v3_n"]
     p_bgack = platform.signals["bgack_3v3_n"]
+    p_berr = platform.signals["berr_3v3_n"]
+    p_ipl0 = platform.signals["ipl0_3v3_n"]
+    p_ipl1 = platform.signals["ipl1_3v3_n"]
+    p_ipl2 = platform.signals["ipl2_3v3_n"]
 
     # Yield initial state
     yield p_as.eq(1)
@@ -39,6 +43,10 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
     yield p_dsack1.eq(1)
     yield p_bg.eq(1)
     yield p_bgack.eq(1)
+    yield p_berr.eq(1) # Inactive High
+    yield p_ipl0.eq(1) # Inactive High (internal pullup assumed on mac side, but here we drive from FPGA side too if testing output)
+    # The FPGA drives IPLs using Open Drain. In simulation we check if FPGA drives 0.
+    # We can check dut.iplX_oe
 
     yield p_addr.eq(0)
     yield p_siz0.eq(0)
@@ -108,6 +116,35 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
 
     yield
     yield
+
+    # ---------------------------------------------------------
+    print("\n--- INTERRUPT TEST ---")
+
+    # Assert IPL0
+    yield dut.irq_out.eq(0b001)
+    yield
+    yield
+
+    # Check if IPL0 OE is active
+    ipl0_oe = yield dut.ipl0_oe
+    if ipl0_oe:
+        print("IPL0 asserted (OE=1)")
+    else:
+        print("FAIL: IPL0 not asserted")
+
+    # Check others are 0
+    ipl1_oe = yield dut.ipl1_oe
+    if ipl1_oe: print("FAIL: IPL1 incorrectly asserted")
+
+    # Clear
+    yield dut.irq_out.eq(0)
+    yield
+    yield
+    ipl0_oe = yield dut.ipl0_oe
+    if not ipl0_oe:
+        print("IPL0 deasserted")
+    else:
+         print("FAIL: IPL0 not deasserted")
 
     # ---------------------------------------------------------
     print("\n--- WRITE TEST (Long Word) ---")
@@ -239,6 +276,73 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
              break
     if not bus_released:
         print("FAIL: BGACK not released")
+
+    # ---------------------------------------------------------
+    print("\n--- DMA MASTER BERR TEST ---")
+
+    yield p_as.eq(1)
+    yield p_dsack0.eq(1)
+    yield p_dsack1.eq(1)
+    yield p_bgack.eq(1)
+    yield p_bg.eq(1)
+    yield p_berr.eq(1)
+    yield
+
+    # Request Bus
+    yield wb_dma.stb.eq(1)
+    yield wb_dma.cyc.eq(1)
+    yield wb_dma.we.eq(1)
+    yield wb_dma.adr.eq(0x2000)
+    yield
+
+    # Wait for BR
+    br_asserted = False
+    for i in range(10):
+        yield
+        br_oe = yield dut.br_oe
+        if br_oe:
+             br_asserted = True
+             break
+
+    # Grant Bus
+    yield p_bg.eq(0)
+
+    # Wait for BGACK
+    for i in range(15):
+        yield
+        bgack_oe = yield dut.bgack_oe
+        if bgack_oe:
+             break
+
+    # Master drives bus
+    for i in range(10):
+        yield
+        master_as = yield dut.master_as
+        if master_as == 0:
+             break
+
+    # Assert BERR instead of DSACK
+    print("Asserting BERR...")
+    yield p_berr.eq(0)
+    yield
+
+    # Wait for ACK
+    wb_ack_received = False
+    for i in range(10):
+        yield
+        ack = yield wb_dma.ack
+        if ack:
+             wb_ack_received = True
+             print("WB ACK received on BERR")
+             break
+
+    if not wb_ack_received:
+        print("FAIL: No ACK on BERR")
+
+    yield p_berr.eq(1)
+    yield wb_dma.stb.eq(0)
+    yield wb_dma.cyc.eq(0)
+    yield
 
     for i in range(5): yield
 

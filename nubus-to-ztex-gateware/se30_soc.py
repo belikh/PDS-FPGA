@@ -97,12 +97,16 @@ class SE30SoC(SoCCore):
         # Instantiate SE30 Bus Bridge
         self.submodules.se30_bridge = SE30PDS(self, platform, self.wb_read, self.wb_write, self.wb_dma)
 
-        # Dummy CSR to ensure CSR bus is not empty (fix for reduce() error)
-        class DummyCSR(Module, AutoCSR):
+        # SE30 Control CSRs
+        class SE30Control(Module, AutoCSR):
             def __init__(self):
                 self.scratch = CSRStorage(32, name="scratch", reset=0xCAFEFEED)
+                self.irq_out = CSRStorage(3, name="irq_out", reset=0, description="Interrupt Request Out [IPL0, IPL1, IPL2]")
 
-        self.submodules.dummy_csr = DummyCSR()
+        self.submodules.control = SE30Control()
+
+        # Connect Control Signals
+        self.comb += self.se30_bridge.irq_out.eq(self.control.irq_out.storage)
 
 # Build Script -------------------------------------------------------------------------------------
 
