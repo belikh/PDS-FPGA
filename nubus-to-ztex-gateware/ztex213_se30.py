@@ -42,7 +42,7 @@ _se30_pds_io = [
     # CLK2X (1) -> 29 pins
     # Extra: G17 -> 30 pins
     # Extra: H17 -> 31 pins
-    # Extra: T6 (Was tm0_o_n) -> 32 pins
+    # Extra: L3 (Was in HDMI) -> 32 pins
     # Removed U6 from here (used for SIZ0)
     # Removed T4 from here (used for sdcard data)
 
@@ -57,7 +57,8 @@ _se30_pds_io = [
         "T5 " +                   # CLK2X (1)
         "T6 " +                   # EXTRA (1) - Was TM0_O_N
         "G17 " +                  # RESET (1)
-        "H17"                     # MASTER_DIR (1)
+        "H17 " +                  # MASTER_DIR (1)
+        "L3"                      # EXTRA (1) - Was in HDMI
     ), IOStandard("lvttl")),
 
     # Control Signals
@@ -75,11 +76,13 @@ _se30_pds_io = [
     ("siz0_3v3_n",         0, Pins("U6"),  IOStandard("lvttl")), # Was tmoen (Reused)
     # SIZ1
     ("siz1_3v3_n",         0, Pins("J14"), IOStandard("lvttl")), # Was fpga_to_cpld_signal
+    # /BERR
+    ("berr_3v3_n",         0, Pins("J16"), IOStandard("lvttl")), # Was tm1_o_n
 
     # FC0-2
     ("fc_3v3_n",           0, Pins("G14 R3 R5"), IOStandard("lvttl")), # Misc pins
 
-    # Interrupts /IRQ1-3
+    # Interrupts /IRQ1-3 (Slot Interrupts)
     ("irq_3v3_n",          0, Pins("U8 K13 J15"), IOStandard("lvttl")), # Reusing unused inputs
 
     # Bus Arbitration
@@ -95,21 +98,21 @@ _se30_peripherals = [
      Subsignal("dm", Pins("A11")),
      IOStandard("LVCMOS33")
     ),
-    ## HDMI (Using V1.2 pins)
-    ("hdmi", 0,
-        Subsignal("clk_p",   Pins("M4"), IOStandard("TMDS_33")),
-        Subsignal("clk_n",   Pins("N4"), IOStandard("TMDS_33")),
-        Subsignal("data0_p", Pins("M3"), IOStandard("TMDS_33")),
-        Subsignal("data0_n", Pins("M2"), IOStandard("TMDS_33")),
-        Subsignal("data1_p", Pins("K5"), IOStandard("TMDS_33")),
-        Subsignal("data1_n", Pins("L4"), IOStandard("TMDS_33")),
-        Subsignal("data2_p", Pins("K3"), IOStandard("TMDS_33")),
-        Subsignal("data2_n", Pins("L3"), IOStandard("TMDS_33")),
-        Subsignal("hpd",     Pins("N6"), IOStandard("LVCMOS33")),
-        Subsignal("sda",     Pins("M6"), IOStandard("LVCMOS33")),
-        Subsignal("scl",     Pins("L6"), IOStandard("LVCMOS33")),
-        Subsignal("cec",     Pins("L5"), IOStandard("LVCMOS33")),
-    ),
+    ## HDMI (Using V1.2 pins) - DISABLED to free pins for PDS
+    #("hdmi", 0,
+    #    Subsignal("clk_p",   Pins("M4"), IOStandard("TMDS_33")),
+    #    Subsignal("clk_n",   Pins("N4"), IOStandard("TMDS_33")),
+    #    Subsignal("data0_p", Pins("M3"), IOStandard("TMDS_33")),
+    #    Subsignal("data0_n", Pins("M2"), IOStandard("TMDS_33")),
+    #    Subsignal("data1_p", Pins("K5"), IOStandard("TMDS_33")),
+    #    Subsignal("data1_n", Pins("L4"), IOStandard("TMDS_33")),
+    #    Subsignal("data2_p", Pins("K3"), IOStandard("TMDS_33")),
+    #    Subsignal("data2_n", Pins("L3"), IOStandard("TMDS_33")),
+    #    Subsignal("hpd",     Pins("N6"), IOStandard("LVCMOS33")),
+    #    Subsignal("sda",     Pins("M6"), IOStandard("LVCMOS33")),
+    #    Subsignal("scl",     Pins("L6"), IOStandard("LVCMOS33")),
+    #    Subsignal("cec",     Pins("L5"), IOStandard("LVCMOS33")),
+    #),
     ## micro-sd
     ("sdcard", 0,
         Subsignal("data", Pins("U1 T3 T4 U4"), Misc("PULLUP True")),

@@ -11,6 +11,8 @@ class MockPlatformCached:
         if name not in self.signals:
             if name == "pds_d_3v3_n" or name == "pds_a_3v3_n":
                  self.signals[name] = Signal(32, name=name)
+            elif name == "irq_3v3_n":
+                 self.signals[name] = Signal(3, name=name)
             else:
                  self.signals[name] = Signal(name=name)
         return self.signals[name]
@@ -31,9 +33,7 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
     p_bg = platform.signals["bg_3v3_n"]
     p_bgack = platform.signals["bgack_3v3_n"]
     p_berr = platform.signals["berr_3v3_n"]
-    p_ipl0 = platform.signals["ipl0_3v3_n"]
-    p_ipl1 = platform.signals["ipl1_3v3_n"]
-    p_ipl2 = platform.signals["ipl2_3v3_n"]
+    p_irq = platform.signals["irq_3v3_n"] # Signal(3)
 
     # Yield initial state
     yield p_as.eq(1)
@@ -44,9 +44,9 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
     yield p_bg.eq(1)
     yield p_bgack.eq(1)
     yield p_berr.eq(1) # Inactive High
-    yield p_ipl0.eq(1) # Inactive High (internal pullup assumed on mac side, but here we drive from FPGA side too if testing output)
-    # The FPGA drives IPLs using Open Drain. In simulation we check if FPGA drives 0.
-    # We can check dut.iplX_oe
+    yield p_irq.eq(0b111) # Inactive High (internal pullup) (assuming open drain logic means externally high if not driven)
+    # The FPGA drives IRQs using Open Drain. If active (1 internally), it drives 0.
+    # In simulation, we can check dut.iplX_oe
 
     yield p_addr.eq(0)
     yield p_siz0.eq(0)
@@ -120,21 +120,21 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
     # ---------------------------------------------------------
     print("\n--- INTERRUPT TEST ---")
 
-    # Assert IPL0
+    # Assert IRQ1 (Bit 0)
     yield dut.irq_out.eq(0b001)
     yield
     yield
 
-    # Check if IPL0 OE is active
+    # Check if IPL0 (IRQ1) OE is active
     ipl0_oe = yield dut.ipl0_oe
     if ipl0_oe:
-        print("IPL0 asserted (OE=1)")
+        print("IRQ1 asserted (OE=1)")
     else:
-        print("FAIL: IPL0 not asserted")
+        print("FAIL: IRQ1 not asserted")
 
     # Check others are 0
     ipl1_oe = yield dut.ipl1_oe
-    if ipl1_oe: print("FAIL: IPL1 incorrectly asserted")
+    if ipl1_oe: print("FAIL: IRQ2 incorrectly asserted")
 
     # Clear
     yield dut.irq_out.eq(0)
@@ -142,9 +142,9 @@ def test_bench(dut, platform, wb_read, wb_write, wb_dma):
     yield
     ipl0_oe = yield dut.ipl0_oe
     if not ipl0_oe:
-        print("IPL0 deasserted")
+        print("IRQ1 deasserted")
     else:
-         print("FAIL: IPL0 not deasserted")
+         print("FAIL: IRQ1 not deasserted")
 
     # ---------------------------------------------------------
     print("\n--- WRITE TEST (Long Word) ---")
