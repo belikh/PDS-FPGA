@@ -24,7 +24,12 @@ class SE30PDS(Module):
         p_dsack1 = platform.request("dsack1_3v3_n")
         p_siz0 = platform.request("siz0_3v3_n")
         p_siz1 = platform.request("siz1_3v3_n")
-        # p_berr = platform.request("berr_3v3_n") # Not driven yet
+        p_berr = platform.request("berr_3v3_n")
+
+        # Interrupts (Output from FPGA to Mac)
+        p_ipl0 = platform.request("ipl0_3v3_n")
+        p_ipl1 = platform.request("ipl1_3v3_n")
+        p_ipl2 = platform.request("ipl2_3v3_n")
 
         # Arbitration
         p_br = platform.request("br_3v3_n")
@@ -39,6 +44,13 @@ class SE30PDS(Module):
         data_in = Signal(32)
         data_out = Signal(32)
         data_oe = Signal()
+
+        # Interrupts (Input from SoC)
+        self.irq_out = Signal(3) # [IPL0, IPL1, IPL2] - Active High Internal
+
+        # Bus Error (Input)
+        berr_raw = Signal()
+        berr_sys = Signal()
 
         # Address Bus (Bidirectional)
         slave_addr_raw = Signal(32)
@@ -122,6 +134,15 @@ class SE30PDS(Module):
              # BGACK is InOut (Open Drain) - we need to monitor it too
              self.specials += Tristate(p_bgack, bgack_out, bgack_oe, bgack_raw)
 
+             # Interrupts (Open Drain Emulation)
+             # If irq_out[x] is 1, drive 0. If 0, High-Z (1 via pull-up)
+             self.specials += Tristate(p_ipl0, Signal(reset=0), self.irq_out[0], Signal())
+             self.specials += Tristate(p_ipl1, Signal(reset=0), self.irq_out[1], Signal())
+             self.specials += Tristate(p_ipl2, Signal(reset=0), self.irq_out[2], Signal())
+
+             # BERR Input
+             self.specials += Tristate(p_berr, Signal(), Signal(), berr_raw)
+
         else:
              # Simulation Logic
              self.comb += [
@@ -134,7 +155,8 @@ class SE30PDS(Module):
                  slave_siz1_raw.eq(p_siz1),
                  master_dsack0_raw.eq(p_dsack0),
                  master_dsack1_raw.eq(p_dsack1),
-                 bgack_raw.eq(p_bgack)
+                 bgack_raw.eq(p_bgack),
+                 berr_raw.eq(p_berr)
              ]
              # For outputs in SIM, we usually rely on testbench to check signals directly
              self.data_out = data_out
@@ -146,6 +168,11 @@ class SE30PDS(Module):
              self.master_ctrl_oe = master_ctrl_oe
              self.br_oe = br_oe
              self.bgack_oe = bgack_oe
+
+             # Expose IPL output enables for simulation verification
+             self.ipl0_oe = self.irq_out[0]
+             self.ipl1_oe = self.irq_out[1]
+             self.ipl2_oe = self.irq_out[2]
 
         # Synchronization
         self.specials += [
@@ -159,6 +186,7 @@ class SE30PDS(Module):
             MultiReg(master_dsack1_raw, master_dsack1_sys),
             MultiReg(p_bg, bg_sys),
             MultiReg(bgack_raw, bgack_sys),
+            MultiReg(berr_raw, berr_sys),
         ]
 
         # Debug signals
@@ -411,6 +439,15 @@ class SE30PDS(Module):
                  If(~wb_dma.we,
                      NextValue(wb_dma.dat_r, data_in)
                  ),
+                 wb_dma.ack.eq(1),
+                 NextState("COMPLETE")
+             ).Elif(~berr_sys, # Bus Error (Active Low)
+                 # Abort cycle
+                 # We should probably signal error to WB, but simple ack with error flag is enough if supported
+                 # Standard WB simple only has ACK. Maybe we just ACK and let software handle weirdness?
+                 # Or just hang? No, must not hang.
+                 # Let's ACK but maybe we need an ERR signal on WB if we supported it.
+                 # For now, just finish cycle.
                  wb_dma.ack.eq(1),
                  NextState("COMPLETE")
              )
