@@ -26,8 +26,9 @@ _se30_pds_io = [
     # SE/30 PDS Signals
     # CPUCLK (15.6672 MHz / C16M)
     ("clk_3v3_n",          0, Pins("H16"), IOStandard("lvttl")), # Corresponds to C16M (Row 38 C)
-    ("cpu_clk_3v3_n",      0, Pins("V1"),  IOStandard("lvttl")), # CPUCLOCK 16.67MHz (Row 38 A) - Was SD_CLK
-    ("eclk_3v3_n",         0, Pins("T4"),  IOStandard("lvttl")), # ECLK (Row 38 B) - Was SD_D2
+    # CPUCLK and ECLK removed to free pins for SD Card (V1, T4)
+    # ("cpu_clk_3v3_n",      0, Pins("V1"),  IOStandard("lvttl")),
+    # ("eclk_3v3_n",         0, Pins("T4"),  IOStandard("lvttl")),
 
     # Address Bus (A0-A31) - Reusing 'ad' pins
     ("pds_a_3v3_n",        0, Pins("A13 A14 C12 B12 B13 B14 A15 A16 "
@@ -44,9 +45,7 @@ _se30_pds_io = [
     # CLK2X (1) -> 29 pins
     # Extra: G17 -> 30 pins
     # Extra: H17 -> 31 pins
-    # Extra: L3 (Was in HDMI) -> 32 pins
-    # Removed U6 from here (used for SIZ0)
-    # Removed T4 from here (used for sdcard data)
+    # Extra: B11 (Was USB DP) -> 32 pins (Replaces L3 which was HDMI)
 
     ("pds_d_3v3_n",        0, Pins(
         "U7 V6 V7 " +             # ID (3)
@@ -58,9 +57,9 @@ _se30_pds_io = [
         "V9 U9 " +                # LED/Serial (2)
         "T5 " +                   # CLK2X (1)
         "T6 " +                   # EXTRA (1) - Was TM0_O_N
-        "G17 " +                  # RESET (1)
+        "G17 " +                  # RESET (1) (Note: G17 is used as Data bit here, not Reset signal)
         "H17 " +                  # MASTER_DIR (1)
-        "L3"                      # EXTRA (1) - Was in HDMI
+        "B11"                     # EXTRA (1) - Was USB DP (Replaces L3)
     ), IOStandard("lvttl")),
 
     # Control Signals
@@ -92,70 +91,51 @@ _se30_pds_io = [
     ("bg_3v3_n",           0, Pins("R7"), IOStandard("lvttl")),
     ("bgack_3v3_n",        0, Pins("R8"), IOStandard("lvttl")),
 
-    # Additional Signals for Complete Coverage
-    # Using freed HDMI and SD/USB pins
-    ("nubus_3v3_n",        0, Pins("N6"), IOStandard("lvttl")), # HDMI HPD
-    ("buslock_3v3_n",      0, Pins("M6"), IOStandard("lvttl")), # HDMI SDA
-    ("tm1a_3v3_n",         0, Pins("L6"), IOStandard("lvttl")), # HDMI SCL
-    ("tm0a_3v3_n",         0, Pins("L5"), IOStandard("lvttl")), # HDMI CEC
-    ("ipl2_3v3_n",         0, Pins("N4"), IOStandard("lvttl")), # HDMI CLK N
-    ("ipl1_3v3_n",         0, Pins("M4"), IOStandard("lvttl")), # HDMI CLK P
-    ("ipl0_3v3_n",         0, Pins("M3"), IOStandard("lvttl")), # HDMI D0 P
-    ("ciout_3v3_n",        0, Pins("M2"), IOStandard("lvttl")), # HDMI D0 N
-    ("rmc_3v3_n",          0, Pins("K5"), IOStandard("lvttl")), # HDMI D1 P
-    ("sterm_3v3_n",        0, Pins("L4"), IOStandard("lvttl")), # HDMI D1 N
-    ("cback_3v3_n",        0, Pins("K3"), IOStandard("lvttl")), # HDMI D2 P
-    ("cbreq_3v3_n",        0, Pins("U1"), IOStandard("lvttl")), # SD D0
-    ("halt_3v3_n",         0, Pins("T3"), IOStandard("lvttl")), # SD D1
-    ("pwroff_3v3_n",       0, Pins("U3"), IOStandard("lvttl")), # SD CMD
-    ("reset_3v3_n",        0, Pins("U4"), IOStandard("lvttl")), # SD D3
+    # Reset
+    # Mapped to A11 (Was USB DM) to avoid conflict with SD Card D3 (U4)
+    ("reset_3v3_n",        0, Pins("A11"), IOStandard("lvttl")),
 ]
 
 _se30_peripherals = [
-    ## USB - DISABLED to free pins
-    #("usb", 0,
-    # Subsignal("dp", Pins("B11")),
-    # Subsignal("dm", Pins("A11")),
-    # IOStandard("LVCMOS33")
-    #),
-    ## HDMI (Using V1.2 pins) - DISABLED to free pins for PDS
-    #("hdmi", 0,
-    #    Subsignal("clk_p",   Pins("M4"), IOStandard("TMDS_33")),
-    #    Subsignal("clk_n",   Pins("N4"), IOStandard("TMDS_33")),
-    #    Subsignal("data0_p", Pins("M3"), IOStandard("TMDS_33")),
-    #    Subsignal("data0_n", Pins("M2"), IOStandard("TMDS_33")),
-    #    Subsignal("data1_p", Pins("K5"), IOStandard("TMDS_33")),
-    #    Subsignal("data1_n", Pins("L4"), IOStandard("TMDS_33")),
-    #    Subsignal("data2_p", Pins("K3"), IOStandard("TMDS_33")),
-    #    Subsignal("data2_n", Pins("L3"), IOStandard("TMDS_33")),
-    #    Subsignal("hpd",     Pins("N6"), IOStandard("LVCMOS33")),
-    #    Subsignal("sda",     Pins("M6"), IOStandard("LVCMOS33")),
-    #    Subsignal("scl",     Pins("L6"), IOStandard("LVCMOS33")),
-    #    Subsignal("cec",     Pins("L5"), IOStandard("LVCMOS33")),
-    #),
-    ## micro-sd - DISABLED to free pins
-    #("sdcard", 0,
-    #    Subsignal("data", Pins("U1 T3 T4 U4"), Misc("PULLUP True")),
-    #    Subsignal("cmd",  Pins("U3"), Misc("PULLUP True")),
-    #    Subsignal("clk",  Pins("V1")),
-    #    Misc("SLEW=FAST"),
-    #    IOStandard("LVCMOS33"),
-    #),
+    # USB - DISABLED (Pins used for PDS Data and Reset)
+    # ("usb", 0,
+    #  Subsignal("dp", Pins("B11")),
+    #  Subsignal("dm", Pins("A11")),
+    #  IOStandard("LVCMOS33")
+    # ),
+
+    # HDMI (Using V1.2 pins)
+    # Enabled now that conflicts are resolved
+    ("hdmi", 0,
+        Subsignal("clk_p",   Pins("M4"), IOStandard("TMDS_33")),
+        Subsignal("clk_n",   Pins("N4"), IOStandard("TMDS_33")),
+        Subsignal("data0_p", Pins("M3"), IOStandard("TMDS_33")),
+        Subsignal("data0_n", Pins("M2"), IOStandard("TMDS_33")),
+        Subsignal("data1_p", Pins("K5"), IOStandard("TMDS_33")),
+        Subsignal("data1_n", Pins("L4"), IOStandard("TMDS_33")),
+        Subsignal("data2_p", Pins("K3"), IOStandard("TMDS_33")),
+        Subsignal("data2_n", Pins("L3"), IOStandard("TMDS_33")),
+        Subsignal("hpd",     Pins("N6"), IOStandard("LVCMOS33")),
+        Subsignal("sda",     Pins("M6"), IOStandard("LVCMOS33")),
+        Subsignal("scl",     Pins("L6"), IOStandard("LVCMOS33")),
+        Subsignal("cec",     Pins("L5"), IOStandard("LVCMOS33")),
+    ),
+
+    # micro-sd
+    # Enabled now that conflicts are resolved
+    ("sdcard", 0,
+        Subsignal("data", Pins("U1 T3 T4 U4"), Misc("PULLUP True")),
+        Subsignal("cmd",  Pins("U3"), Misc("PULLUP True")),
+        Subsignal("clk",  Pins("V1")),
+        Misc("SLEW=FAST"),
+        IOStandard("LVCMOS33"),
+    ),
 ]
 
 class SE30Platform(ZTexPlatform):
     def __init__(self, variant="ztex2.13a"):
         # The base ZTexPlatform expects 'connectors'.
-        # In ztex213_nubus.py, it passed connectors based on version.
-        # Here we hardcode or pass empty if we used P1 pins for data.
-        # But wait, we used "P1" pins in our definition, but defined them as explicit pins in _se30_pds_io.
-        # So we don't need 'connectors' list unless we want to use the "P1:x" syntax.
-        # But we explicitly listed the pins (M1 L1...).
-        # So we can pass connectors=[]
-
-        # We need to manually call init because ZTexPlatform.__init__ calls XilinxPlatform.__init__
-        # And if we pass connectors=None (default), it fails iterating.
-
+        # We pass empty list as we define pins explicitly.
         ZTexPlatform.__init__(self, variant=variant, version="V1.2", connectors=[])
         self.add_extension(_se30_pds_io)
         self.add_extension(_se30_peripherals)

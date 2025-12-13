@@ -35,24 +35,8 @@ class SE30PDS(Module):
         p_bg = platform.request("bg_3v3_n")
         p_bgack = platform.request("bgack_3v3_n")
 
-        # Additional Signals (Complete Coverage)
-        p_nubus = platform.request("nubus_3v3_n")
-        p_buslock = platform.request("buslock_3v3_n")
-        p_tm1a = platform.request("tm1a_3v3_n")
-        p_tm0a = platform.request("tm0a_3v3_n")
-        p_ipl2 = platform.request("ipl2_3v3_n")
-        p_ipl1 = platform.request("ipl1_3v3_n")
-        p_ipl0 = platform.request("ipl0_3v3_n")
-        p_ciout = platform.request("ciout_3v3_n")
-        p_rmc = platform.request("rmc_3v3_n")
-        p_sterm = platform.request("sterm_3v3_n")
-        p_cback = platform.request("cback_3v3_n")
-        p_cbreq = platform.request("cbreq_3v3_n")
-        p_halt = platform.request("halt_3v3_n")
-        p_pwroff = platform.request("pwroff_3v3_n")
+        # Reset (Input)
         p_reset = platform.request("reset_3v3_n")
-        p_cpu_clk = platform.request("cpu_clk_3v3_n")
-        p_eclk = platform.request("eclk_3v3_n")
 
         # ==============================================================================
         # Signal Definitions
@@ -69,6 +53,9 @@ class SE30PDS(Module):
         # Bus Error (Input)
         berr_raw = Signal()
         berr_sys = Signal()
+
+        # Reset (Input)
+        self.reset_in = Signal()
 
         # Address Bus (Bidirectional)
         slave_addr_raw = Signal(32)
@@ -165,44 +152,8 @@ class SE30PDS(Module):
              # BERR Input
              self.specials += Tristate(p_berr, Signal(), Signal(), berr_raw)
 
-             # Additional Signals Tristates (Default to High-Z/Input for now)
-             # Inputs are exposed as self.xxx_in for internal logic use
-             self.nubus_in = Signal()
-             self.buslock_in = Signal()
-             self.tm1a_in = Signal()
-             self.tm0a_in = Signal()
-             self.ipl2_in = Signal()
-             self.ipl1_in = Signal()
-             self.ipl0_in = Signal()
-             self.ciout_in = Signal()
-             self.rmc_in = Signal()
-             self.sterm_in = Signal()
-             self.cback_in = Signal()
-             self.cbreq_in = Signal()
-             self.halt_in = Signal()
-             self.pwroff_in = Signal()
-             self.reset_in = Signal()
-
-             self.specials += Tristate(p_nubus, Signal(), 0, self.nubus_in)
-             self.specials += Tristate(p_buslock, Signal(), 0, self.buslock_in)
-             self.specials += Tristate(p_tm1a, Signal(), 0, self.tm1a_in)
-             self.specials += Tristate(p_tm0a, Signal(), 0, self.tm0a_in)
-             self.specials += Tristate(p_ipl2, Signal(), 0, self.ipl2_in)
-             self.specials += Tristate(p_ipl1, Signal(), 0, self.ipl1_in)
-             self.specials += Tristate(p_ipl0, Signal(), 0, self.ipl0_in)
-             self.specials += Tristate(p_ciout, Signal(), 0, self.ciout_in)
-             self.specials += Tristate(p_rmc, Signal(), 0, self.rmc_in)
-             self.specials += Tristate(p_sterm, Signal(), 0, self.sterm_in)
-             self.specials += Tristate(p_cback, Signal(), 0, self.cback_in)
-             self.specials += Tristate(p_cbreq, Signal(), 0, self.cbreq_in)
-             self.specials += Tristate(p_halt, Signal(), 0, self.halt_in)
-             self.specials += Tristate(p_pwroff, Signal(), 0, self.pwroff_in)
+             # Reset Input (Tristate used as Input Buffer)
              self.specials += Tristate(p_reset, Signal(), 0, self.reset_in)
-             # Clocks are just inputs (already requested), no Tristate needed typically unless we drive them.
-             # But platform.request returns an IO object.
-             # We expose them as instance attributes.
-             self.cpu_clk = p_cpu_clk
-             self.eclk = p_eclk
 
         else:
              # Simulation Logic
