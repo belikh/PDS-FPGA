@@ -4,9 +4,13 @@
 
 The goal of this repository is to be able to interface a modern (2021 era) [FPGA](https://en.wikipedia.org/wiki/Field-programmable_gate_array) with a [NuBus](https://en.wikipedia.org/wiki/NuBus) host, specifically Apple's [Macintosh II](https://en.wikipedia.org/wiki/Macintosh_II_family) and [Macintosh Quadra](https://en.wikipedia.org/wiki/Macintosh_Quadra). NuBus was widely used by Apple and a little by others (such as NeXT), but was progressively displaced by PCI from the mid-90s onward, and is thoroughly obsolete.
 
-So unless you're a retrocomputing enthusiast with such a machine, this is useless. If you are such an enthusiast, then maybe the ability to connect a modern LCD monitor using a digital interface to an old Macintosh might be of interest to you.
+**Update:** This repository also includes experimental support for the **Macintosh SE/30 Processor Direct Slot (PDS)**, allowing the same ZTex FPGA module to be used in an SE/30 with a new adapter.
 
-This project was 'spun off' the [SBusFPGA](https://github.com/rdolbeau/SBusFPGA), a similar project for the SBus used in Sun's SPARCstation.
+## Documentation
+
+Full documentation is available at [docs/](docs/).
+
+You can browse the [Documentation Site](docs/index.md) (or GitHub Pages link if enabled).
 
 ## Current status
 
