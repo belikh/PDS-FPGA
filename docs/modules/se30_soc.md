@@ -20,7 +20,7 @@ The `SE30SoC` class defines the top-level System-on-Chip. It configures the plat
 - **Masters**:
     - `se30_read`: Driven by PDS Slave Read logic.
     - `se30_write`: Driven by PDS Slave Write logic.
-    - `se30_dma`: Internal master for DMA (Placeholder).
+    - `se30_dma`: Internal master for DMA.
 - **Slaves**:
     - `sram`: Internal Block RAM (8KB).
     - `control`: Control CSRs.
@@ -31,7 +31,7 @@ Allows software (via the Mac) to interact with the FPGA configuration.
 | Register | Address Offset | Access | Description |
 | :--- | :--- | :--- | :--- |
 | `scratch` | 0x00 | RW | Scratchpad register for testing. |
-| `irq_out` | 0x04 | RW | Interrupt Request Output. Bit 0->/IRQ1, Bit 1->/IRQ2, Bit 2->/IRQ3. |
+| `irq_out` | 0x04 | RW | Interrupt Request Output (Active High Internal). <br>Bit 0: `/IRQ1` (IPL0)<br>Bit 1: `/IRQ2` (IPL1)<br>Bit 2: `/IRQ3` (IPL2)<br>Setting a bit to 1 asserts the corresponding open-drain interrupt line low to the Mac. |
 
 ## Build System
 The script uses `litex.soc.integration.builder` to generate the synthesis files and run Vivado.
